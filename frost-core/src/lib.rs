@@ -49,6 +49,7 @@ use scalar_mul::VartimeMultiscalarMul;
 // Re-export serde
 #[cfg(feature = "serde")]
 pub use serde;
+use sha3::{Digest, Keccak256};
 pub use signature::Signature;
 pub use signing_key::SigningKey;
 pub use traits::{Ciphersuite, Element, Field, Group, Scalar};
@@ -107,14 +108,15 @@ where
 /// [RFC]: https://www.ietf.org/archive/id/draft-irtf-cfrg-frost-14.html#section-3.2
 #[cfg_attr(feature = "internals", visibility::make(pub))]
 #[cfg_attr(docsrs, doc(cfg(feature = "internals")))]
-fn challenge<C>(R: &Element<C>, verifying_key: &VerifyingKey<C>, msg: &[u8]) -> Challenge<C>
+fn challenge<C>(R: &Element<C>, _verifying_key: &VerifyingKey<C>, msg: &[u8]) -> Challenge<C>
 where
     C: Ciphersuite,
 {
     let mut preimage = vec![];
 
-    preimage.extend_from_slice(<C::Group>::serialize(R).as_ref());
-    preimage.extend_from_slice(<C::Group>::serialize(&verifying_key.element).as_ref());
+    let R = <C::Group>::serialize(R);
+    preimage.extend_from_slice(Keccak256::digest(R.as_ref())[12..32].as_ref());
+    // preimage.extend_from_slice(<C::Group>::serialize(&verifying_key.element).as_ref());
     preimage.extend_from_slice(msg);
 
     Challenge(C::H2(&preimage[..]))

@@ -5,9 +5,12 @@
 #![doc = include_str!("../README.md")]
 #![doc = document_features::document_features!()]
 
+extern crate core;
+
 use std::collections::BTreeMap;
 
 use frost_rerandomized::RandomizedCiphersuite;
+use k256::elliptic_curve::point::AffineCoordinates;
 use k256::{
     elliptic_curve::{
         group::prime::PrimeCurveAffine,
@@ -18,7 +21,6 @@ use k256::{
     AffinePoint, ProjectivePoint, Scalar,
 };
 use rand_core::{CryptoRng, RngCore};
-use sha2::{Digest, Sha256};
 
 use frost_core as frost;
 
@@ -28,7 +30,7 @@ mod tests;
 // Re-exports in our public API
 pub use frost_core::{serde, Ciphersuite, Field, FieldError, Group, GroupError};
 pub use rand_core;
-
+use sha3::{Digest, Keccak256};
 /// An error.
 pub type Error = frost_core::Error<Secp256K1Sha256>;
 
@@ -98,7 +100,7 @@ impl Group for Secp256K1Group {
     /// be serialized in FROST, else we error.
     ///
     /// [1]: https://secg.org/sec1-v2.pdf
-    type Serialization = [u8; 33];
+    type Serialization = [u8; 65];
 
     fn cofactor() -> <Self::Field as Field>::Scalar {
         Scalar::ONE
@@ -113,8 +115,8 @@ impl Group for Secp256K1Group {
     }
 
     fn serialize(element: &Self::Element) -> Self::Serialization {
-        let mut fixed_serialized = [0; 33];
-        let serialized_point = element.to_affine().to_encoded_point(true);
+        let mut fixed_serialized = [0; 65];
+        let serialized_point = element.to_affine().to_encoded_point(false);
         let serialized = serialized_point.as_bytes();
         // Sanity check; either it takes all bytes or a single byte (identity).
         assert!(serialized.len() == fixed_serialized.len() || serialized.len() == 1);
@@ -150,7 +152,7 @@ impl Group for Secp256K1Group {
 }
 
 fn hash_to_array(inputs: &[&[u8]]) -> [u8; 32] {
-    let mut h = Sha256::new();
+    let mut h = Keccak256::default();
     for i in inputs {
         h.update(i);
     }
@@ -159,9 +161,9 @@ fn hash_to_array(inputs: &[&[u8]]) -> [u8; 32] {
     output
 }
 
-fn hash_to_scalar(domain: &[u8], msg: &[u8]) -> Scalar {
+fn hash_to_scalar(_domain: &[u8], msg: &[u8]) -> Scalar {
     let mut u = [Secp256K1ScalarField::zero()];
-    hash_to_field::<ExpandMsgXmd<Sha256>, Scalar>(&[msg], &[domain], &mut u)
+    hash_to_field::<ExpandMsgXmd<Keccak256>, Scalar>(&[msg], &[&[]], &mut u)
         .expect("should never return error according to error cases described in ExpandMsgXmd");
     u[0]
 }
@@ -441,3 +443,52 @@ pub type SigningKey = frost_core::SigningKey<S>;
 
 /// A valid verifying key for Schnorr signatures on FROST(secp256k1, SHA-256).
 pub type VerifyingKey = frost_core::VerifyingKey<S>;
+
+/// Returns the params for verification in ecrecover
+pub fn params_for_ecrecover(
+    threshold_signature: &Signature,
+    group_public_key: &VerifyingKey,
+    message: &[u8],
+) -> Result<([u8; 32], u8, [u8; 32], [u8; 32]), Error> {
+    let pubKeyYParity = if group_public_key.to_element().to_affine().y_is_odd().into() {
+        1u8
+    } else {
+        0
+    };
+
+    let mut preimage = Vec::new();
+    preimage.extend_from_slice(
+        &Keccak256::digest(
+            threshold_signature
+                .R()
+                .to_affine()
+                .to_encoded_point(false)
+                .as_ref(),
+        )[12..32],
+    );
+    preimage.extend_from_slice(message.as_ref());
+
+    let e = hash_to_scalar(&[], preimage.as_slice());
+
+    let P_x = Scalar::from_repr(group_public_key.to_element().to_affine().x()).unwrap();
+
+    let m = threshold_signature.z().negate().mul(&P_x);
+    let v = pubKeyYParity;
+    let r = P_x;
+    let s = e.negate().mul(&P_x);
+
+    let m_bytes = m
+        .to_bytes()
+        .try_into()
+        .map_err(|_| Error::SerializationError)?;
+    let r_bytes = r
+        .to_bytes()
+        .try_into()
+        .map_err(|_| Error::SerializationError)?;
+    let s_bytes = s
+        .to_bytes()
+        .try_into()
+        .map_err(|_| Error::SerializationError)?;
+
+    Ok((m_bytes, v, r_bytes, s_bytes))
+}

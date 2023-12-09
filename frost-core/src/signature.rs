@@ -1,15 +1,16 @@
 //! Schnorr signatures over prime order groups (or subgroups)
 
 use debugless_unwrap::DebuglessUnwrap;
+use sha3::{Digest, Keccak256};
 
-use crate::{Ciphersuite, Element, Error, Field, Group, Scalar};
+use crate::{Ciphersuite, Element, Error, Field, Group, Scalar, VerifyingKey};
 
 /// A Schnorr signature over some prime order group (or subgroup).
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct Signature<C: Ciphersuite> {
     /// The commitment `R` to the signature nonce.
     pub(crate) R: Element<C>,
-    /// The response `z` to the challenge computed from the commitment `R`, the verifying key, and
+    /// The response `z` to the challenge computed from the commitment `R`, and
     /// the message.
     pub(crate) z: Scalar<C>,
 }
@@ -78,6 +79,16 @@ where
         bytes.extend(<<C::Group as Group>::Field>::serialize(&self.z).as_ref());
 
         bytes.try_into().debugless_unwrap()
+    }
+
+    /// Returns the commitment to Signature nonce
+    pub fn R(&self) -> Element<C> {
+        self.R
+    }
+
+    /// Returns the response to commitment challenge
+    pub fn z(&self) -> Scalar<C> {
+        self.z
     }
 }
 
