@@ -1,9 +1,8 @@
 //! Schnorr signatures over prime order groups (or subgroups)
 
 use debugless_unwrap::DebuglessUnwrap;
-use sha3::{Digest, Keccak256};
 
-use crate::{Ciphersuite, Element, Error, Field, Group, Scalar, VerifyingKey};
+use crate::{Ciphersuite, Element, Error, Field, Group, Scalar};
 
 /// A Schnorr signature over some prime order group (or subgroup).
 #[derive(Copy, Clone, Eq, PartialEq)]

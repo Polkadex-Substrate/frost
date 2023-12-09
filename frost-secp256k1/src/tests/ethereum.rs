@@ -145,7 +145,7 @@ pub fn test_ethereum() {
     let group_signature =
         frost::aggregate(&signing_package, &signature_shares, &pubkey_package).unwrap();
 
-    let (m, v, r, s) = params_for_ecrecover(&group_signature, &group_publickey, &message).unwrap();
+    let (m, v, r, s) = params_for_ecrecover(&group_signature, &group_publickey, &message);
 
     /// Do this section in solidity
     /// e = H(address(R) || m)

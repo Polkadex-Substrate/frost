@@ -349,7 +349,7 @@ pub(crate) fn compute_proof_of_knowledge<C: Ciphersuite, R: RngCore + CryptoRng>
     let c_i = challenge::<C>(identifier, &commitment.verifying_key()?, &R_i)
         .ok_or(Error::DKGNotSupported)?;
     let a_i0 = *coefficients
-        .get(0)
+        .first()
         .expect("coefficients must have at least one element");
     let mu_i = k + a_i0 * c_i.0;
     Ok(Signature { R: R_i, z: mu_i })

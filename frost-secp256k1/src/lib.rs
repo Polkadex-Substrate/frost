@@ -449,7 +449,7 @@ pub fn params_for_ecrecover(
     threshold_signature: &Signature,
     group_public_key: &VerifyingKey,
     message: &[u8],
-) -> Result<([u8; 32], u8, [u8; 32], [u8; 32]), Error> {
+) -> ([u8; 32], u8, [u8; 32], [u8; 32]) {
     let pubKeyYParity = if group_public_key.to_element().to_affine().y_is_odd().into() {
         1u8
     } else {
@@ -477,18 +477,9 @@ pub fn params_for_ecrecover(
     let r = P_x;
     let s = e.negate().mul(&P_x);
 
-    let m_bytes = m
-        .to_bytes()
-        .try_into()
-        .map_err(|_| Error::SerializationError)?;
-    let r_bytes = r
-        .to_bytes()
-        .try_into()
-        .map_err(|_| Error::SerializationError)?;
-    let s_bytes = s
-        .to_bytes()
-        .try_into()
-        .map_err(|_| Error::SerializationError)?;
+    let m_bytes = m.to_bytes().into();
+    let r_bytes = r.to_bytes().into();
+    let s_bytes = s.to_bytes().into();
 
-    Ok((m_bytes, v, r_bytes, s_bytes))
+    (m_bytes, v, r_bytes, s_bytes)
 }

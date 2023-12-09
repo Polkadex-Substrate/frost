@@ -108,6 +108,7 @@ where
 /// [RFC]: https://www.ietf.org/archive/id/draft-irtf-cfrg-frost-14.html#section-3.2
 #[cfg_attr(feature = "internals", visibility::make(pub))]
 #[cfg_attr(docsrs, doc(cfg(feature = "internals")))]
+#[allow(clippy::indexing_slicing)]
 fn challenge<C>(R: &Element<C>, _verifying_key: &VerifyingKey<C>, msg: &[u8]) -> Challenge<C>
 where
     C: Ciphersuite,
@@ -115,6 +116,7 @@ where
     let mut preimage = vec![];
 
     let R = <C::Group>::serialize(R);
+    // NOTE: This indexing slicing will never panic
     preimage.extend_from_slice(Keccak256::digest(R.as_ref())[12..32].as_ref());
     // preimage.extend_from_slice(<C::Group>::serialize(&verifying_key.element).as_ref());
     preimage.extend_from_slice(msg);
