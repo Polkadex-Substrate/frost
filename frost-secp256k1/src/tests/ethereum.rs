@@ -13,12 +13,16 @@ fn ecrecover(m: [u8; 32], v: u8, r: [u8; 32], s: [u8; 32]) -> [u8; 20] {
     let signature = RecoverableSignature::from_compact(&[r, s].concat(), recovery_id).unwrap();
     let public_key = signature.recover(&message).unwrap();
 
-    Keccak256::digest(public_key.serialize_uncompressed().as_ref())[12..32]
+    let pub_key_bytes = &public_key.serialize_uncompressed()[1..];
+    println!("Recovered Public key: {:?}",hex::encode(pub_key_bytes));
+    let hash = Keccak256::digest(pub_key_bytes);
+    println!("Pub key hash: {:?}",hex::encode(hash.to_vec()));
+    hash[12..32]
         .try_into()
         .unwrap()
 }
 
-fn address(uncompressed_pubk: &[u8]) -> [u8; 20] {
+fn address(uncompressed_pubk: &[u8;64]) -> [u8; 20] {
     Keccak256::digest(uncompressed_pubk)[12..32]
         .try_into()
         .unwrap()
@@ -34,12 +38,18 @@ pub fn test_ecrecover() {
     signature.verify(&msg_hash, &public_key).unwrap();
 
     let encoded_sig = signature.serialize_compact();
-    let R = encoded_sig[0..32].try_into().unwrap();
-    let S = encoded_sig[32..64].try_into().unwrap();
+    let R: [u8;32] = encoded_sig[0..32].try_into().unwrap();
+    let S: [u8;32] = encoded_sig[32..64].try_into().unwrap();
+
+    println!("msg: {:?}",hex::encode(msg_hash.as_ref()));
+    println!("R: {:?}",hex::encode(R.as_slice()));
+    println!("S: {:?}",hex::encode(S.as_slice()));
 
     let recovered_address = ecrecover(msg_hash.as_ref().clone(), 1, R, S);
+    println!("recoverd: {:?}",hex::encode(recovered_address));
+    println!("Public key: {:?}",hex::encode(public_key.serialize_uncompressed()));
     let expected_address: [u8; 20] =
-        Keccak256::digest(public_key.serialize_uncompressed().as_ref())[12..32]
+        Keccak256::digest(public_key.serialize_uncompressed()[1..].as_ref())[12..32]
             .try_into()
             .unwrap();
     assert_eq!(recovered_address, expected_address);
@@ -150,7 +160,8 @@ pub fn test_ethereum() {
     /// Do this section in solidity
     /// e = H(address(R) || m)
     let R = group_signature.R().to_encoded_point(false);
-    let address = address(R.as_ref());
+    println!("Len of R: {:?}",R.len());
+    let address = address(R.as_ref()[1..].try_into().unwrap());
     let mut e_preimage = Vec::new();
     e_preimage.extend_from_slice(address.as_slice());
     e_preimage.extend_from_slice(message.as_slice());
