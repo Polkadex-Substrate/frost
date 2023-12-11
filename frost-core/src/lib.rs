@@ -115,9 +115,9 @@ where
 {
     let mut preimage = vec![];
 
-    let R = <C::Group>::serialize(R);
+    let R: [u8;65] = <C::Group>::serialize(R).as_ref().try_into().unwrap();
     // NOTE: This indexing slicing will never panic
-    preimage.extend_from_slice(Keccak256::digest(R.as_ref())[12..32].as_ref());
+    preimage.extend_from_slice(Keccak256::digest(R.as_ref()[1..].as_ref())[12..32].as_ref());
     // preimage.extend_from_slice(<C::Group>::serialize(&verifying_key.element).as_ref());
     preimage.extend_from_slice(msg);
 

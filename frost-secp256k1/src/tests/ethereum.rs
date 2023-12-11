@@ -6,6 +6,7 @@ use secp256k1::ecdsa::{RecoverableSignature, RecoveryId};
 use secp256k1::{Message, Secp256k1, SecretKey};
 use sha3::{Digest, Keccak256};
 use std::collections::BTreeMap;
+use k256::elliptic_curve::point::AffineCoordinates;
 
 fn ecrecover(m: [u8; 32], v: u8, r: [u8; 32], s: [u8; 32]) -> [u8; 20] {
     let message = Message::from_digest(m);
@@ -16,7 +17,7 @@ fn ecrecover(m: [u8; 32], v: u8, r: [u8; 32], s: [u8; 32]) -> [u8; 20] {
     let pub_key_bytes = &public_key.serialize_uncompressed()[1..];
     println!("Recovered Public key: {:?}",hex::encode(pub_key_bytes));
     let hash = Keccak256::digest(pub_key_bytes);
-    println!("Pub key hash: {:?}",hex::encode(hash.to_vec()));
+    // println!("Pub key hash: {:?}",hex::encode(hash.to_vec()));
     hash[12..32]
         .try_into()
         .unwrap()
@@ -157,18 +158,36 @@ pub fn test_ethereum() {
 
     let (m, v, r, s) = params_for_ecrecover(&group_signature, &group_publickey, &message);
 
+    println!("m: {:?}", hex::encode(m));
+    println!("v: {:?}", v);
+    println!("r: {:?}", hex::encode(r));
+    println!("s: {:?}", hex::encode(s));
+
+
+    println!("Inputs for Chainlink contract");
+    // uint256 signingPubKeyX,
+    println!("signingPubKeyX: {:?}",hex::encode(group_publickey.to_element().to_affine().x().as_slice()));
+    //     uint8 pubKeyYParity,
+    println!("pubKeyYParity: {:?}",v);
+    //     uint256 signature,
+    println!("signature: {:?}",hex::encode(group_signature.z().to_bytes().as_slice()));
+    //     uint256 msgHash,
+    println!("msgHash: {:?}",hex::encode(message));
+    //     address nonceTimesGeneratorAddress
+    println!("R: {:?}",hex::encode(group_signature.R().to_encoded_point(false).as_ref()[1..].as_ref()));
     /// Do this section in solidity
     /// e = H(address(R) || m)
     let R = group_signature.R().to_encoded_point(false);
-    println!("Len of R: {:?}",R.len());
+    // println!("Len of R: {:?}",R.len());
     let address = address(R.as_ref()[1..].try_into().unwrap());
+    println!("nonceTimesGeneratorAddress: {:?}", hex::encode(address));
     let mut e_preimage = Vec::new();
     e_preimage.extend_from_slice(address.as_slice());
     e_preimage.extend_from_slice(message.as_slice());
     let e = Keccak256::digest(e_preimage).to_vec();
 
     let address_q = ecrecover(m, v, r, s);
-
+    println!("Recovered address: {:?}",hex::encode(address_q));
     let mut preimage = Vec::new();
     preimage.extend_from_slice(address_q.as_ref());
     preimage.extend_from_slice(message.as_ref());

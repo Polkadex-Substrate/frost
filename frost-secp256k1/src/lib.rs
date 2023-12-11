@@ -463,7 +463,7 @@ pub fn params_for_ecrecover(
                 .R()
                 .to_affine()
                 .to_encoded_point(false)
-                .as_ref(),
+                .as_ref()[1..].as_ref(),
         )[12..32],
     );
     preimage.extend_from_slice(message.as_ref());
