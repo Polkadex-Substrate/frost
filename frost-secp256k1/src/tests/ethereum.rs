@@ -7,7 +7,11 @@ use secp256k1::{Message, Secp256k1, SecretKey};
 use sha3::{Digest, Keccak256};
 use std::collections::BTreeMap;
 use k256::elliptic_curve::point::AffineCoordinates;
-use k256::Scalar;
+use k256::{FieldBytes, Scalar, U256};
+use k256::elliptic_curve::generic_array::GenericArray;
+use k256::elliptic_curve::hash2curve::FromOkm;
+use k256::elliptic_curve::PrimeField;
+use k256::elliptic_curve::scalar::FromUintUnchecked;
 
 fn ecrecover(m: [u8; 32], v: u8, r: [u8; 32], s: [u8; 32]) -> [u8; 20] {
     let message = Message::from_digest(m);
@@ -165,15 +169,31 @@ pub fn test_ethereum() {
     println!("s: {:?}", hex::encode(s));
 
 
+    const ORDER_HEX: &str = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141";
+
+    /// Order of the secp256k1 elliptic curve.
+    // const ORDER: U256 = U256::from_be_hex(ORDER_HEX);
+    // let Q: Scalar = Scalar::from_uint_unchecked(ORDER);
+    // let HALF_Q = (Q >> 1) + Scalar::ONE;
+    let mut Px = Scalar::from_repr(group_publickey.to_element().to_affine().x()).unwrap();
+    // if Px >= HALF_Q {
+    //     Px = Px.negate();
+    // }
+    // assert!(Px < HALF_Q);
+    let mut signature = group_signature.z();
+    // if signature >= Q {
+    //     signature = signature.negate();
+    // }
+    // assert!(signature < Q);
     println!("Inputs for Chainlink contract");
     // uint256 signingPubKeyX,
-    println!("signingPubKeyX: {:?}",hex::encode(group_publickey.to_element().to_affine().x().as_slice()));
-    //     uint8 pubKeyYParity,
-    println!("pubKeyYParity: {:?}",v);
-    //     uint256 signature,
-    println!("signature: {:?}",hex::encode(group_signature.z().negate().to_bytes().as_slice()));
-    //     uint256 msgHash,
-    println!("msgHash: {:?}",hex::encode(message));
+    // println!("signingPubKeyX: {:?}",hex::encode(Px.to_bytes().as_slice()));
+    // //     uint8 pubKeyYParity,
+    // println!("pubKeyYParity: {:?}",v);
+    // //     uint256 signature,
+    // println!("signature: {:?}",hex::encode(signature.to_bytes().as_slice()));
+    // //     uint256 msgHash,
+    // println!("msgHash: {:?}",hex::encode(message));
     //     address nonceTimesGeneratorAddress
     // println!("R: {:?}",hex::encode(group_signature.R().to_encoded_point(false).as_ref()[1..].as_ref()));
     // /// Do this section in solidity
@@ -182,21 +202,21 @@ pub fn test_ethereum() {
     // println!("Len of R: {:?}",R.len());
     let address = address(R.as_ref()[1..].try_into().unwrap());
     println!("nonceTimesGeneratorAddress: {:?}", hex::encode(address));
-    // let mut e_preimage = Vec::new();
-    // e_preimage.extend_from_slice(address.as_slice());
-    // e_preimage.extend_from_slice(message.as_slice());
-    // let e = Keccak256::digest(e_preimage).to_vec();
-    //
-    // let address_q = ecrecover(m, v, r, s);
-    // println!("Recovered address: {:?}",hex::encode(address_q));
-    // let mut preimage = Vec::new();
-    // preimage.extend_from_slice(address_q.as_ref());
-    // preimage.extend_from_slice(message.as_ref());
-    //
-    // let e_ = Keccak256::digest(preimage.as_slice()).to_vec();
-    // assert_eq!(e, e_);
-    // println!("E: {:?}", e);
-    // println!("E': {:?}", e_);
+    let mut e_preimage = Vec::new();
+    e_preimage.extend_from_slice(address.as_slice());
+    e_preimage.extend_from_slice(message.as_slice());
+    let e = Keccak256::digest(e_preimage).to_vec();
+
+    let address_q = ecrecover(m, v, r, s);
+    println!("Recovered address: {:?}",hex::encode(address_q));
+    let mut preimage = Vec::new();
+    preimage.extend_from_slice(address_q.as_ref());
+    preimage.extend_from_slice(message.as_ref());
+
+    let e_ = Keccak256::digest(preimage.as_slice()).to_vec();
+    assert_eq!(e, e_);
+    println!("E: {:?}", e);
+    println!("E': {:?}", e_);
 }
 
 pub fn chainlink_verify(signingPubKeyX: Scalar,

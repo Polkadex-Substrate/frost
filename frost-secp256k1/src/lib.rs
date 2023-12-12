@@ -11,16 +11,14 @@ use std::collections::BTreeMap;
 
 use frost_rerandomized::RandomizedCiphersuite;
 use k256::elliptic_curve::point::AffineCoordinates;
-use k256::{
-    elliptic_curve::{
-        group::prime::PrimeCurveAffine,
-        hash2curve::{hash_to_field, ExpandMsgXmd},
-        sec1::{FromEncodedPoint, ToEncodedPoint},
-        Field as FFField, PrimeField,
-    },
-    AffinePoint, ProjectivePoint, Scalar,
-};
+use k256::{elliptic_curve::{
+    group::prime::PrimeCurveAffine,
+    hash2curve::{hash_to_field, ExpandMsgXmd},
+    sec1::{FromEncodedPoint, ToEncodedPoint},
+    Field as FFField, PrimeField,
+}, AffinePoint, ProjectivePoint, Scalar, U256};
 use k256::elliptic_curve::hash2curve::FromOkm;
+use k256::elliptic_curve::scalar::FromUintUnchecked;
 use rand_core::{CryptoRng, RngCore};
 
 use frost_core as frost;
@@ -470,18 +468,34 @@ pub fn params_for_ecrecover(
     );
     preimage.extend_from_slice(message.as_ref());
 
-    println!("msgHashChallenge preimage: {:?}", hex::encode(&preimage));
-    let e_just_hash = Scalar::from_repr(Keccak256::digest(preimage.as_slice())).unwrap();
     let e = hash_to_scalar(&[], preimage.as_slice());
-    println!("msgHashChallenge (original): {:?}",hex::encode(e.to_bytes().as_slice()));
-    println!("msgHashChallenge (just hash): {:?}",hex::encode(e_just_hash.to_bytes().as_slice()));
+    // println!("msgHashChallenge (original): {:?}",hex::encode(e.to_bytes().as_slice()));
 
-    let P_x = Scalar::from_repr(group_public_key.to_element().to_affine().x()).unwrap();
+    let mut P_x = Scalar::from_repr(group_public_key.to_element().to_affine().x()).unwrap();
 
-    let m = threshold_signature.z().negate().mul(&P_x);
+
+    const ORDER_HEX: &str = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141";
+
+    /// Order of the secp256k1 elliptic curve.
+    const ORDER: U256 = U256::from_be_hex(ORDER_HEX);
+    let Q: Scalar = Scalar::from_uint_unchecked(ORDER);
+    let HALF_Q = (Q >> 1) + Scalar::ONE;
+    println!("P_x < HALF_Q: {:?}",P_x < HALF_Q);
+    // if P_x >= HALF_Q {
+    //     P_x = P_x.negate();
+    // }
+
+    let mut signature = threshold_signature.z();
+    // if signature >= Q {
+    //     signature = signature.negate();
+    // }
+    println!("signature < Q: {:?}",signature < Q);
+
+
+    let m = Q.sub(&signature.mul(&P_x));
     let v = pubKeyYParity;
     let r = P_x;
-    let s = e.negate().mul(&P_x);
+    let s = Q.sub(&e).mul(&P_x);
 
     let m_bytes = m.to_bytes().into();
     let r_bytes = r.to_bytes().into();
