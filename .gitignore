@@ -4,3 +4,8 @@ Cargo.lock
 *~
 **/.DS_Store
 .vscode/*
+/.idea/.gitignore
+/.idea/frost.iml
+/.idea/git_toolbox_prj.xml
+/.idea/modules.xml
+/.idea/vcs.xml
