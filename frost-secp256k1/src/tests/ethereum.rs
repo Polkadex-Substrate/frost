@@ -7,6 +7,7 @@ use secp256k1::{Message, Secp256k1, SecretKey};
 use sha3::{Digest, Keccak256};
 use std::collections::BTreeMap;
 use k256::elliptic_curve::point::AffineCoordinates;
+use k256::Scalar;
 
 fn ecrecover(m: [u8; 32], v: u8, r: [u8; 32], s: [u8; 32]) -> [u8; 20] {
     let message = Message::from_digest(m);
@@ -170,30 +171,46 @@ pub fn test_ethereum() {
     //     uint8 pubKeyYParity,
     println!("pubKeyYParity: {:?}",v);
     //     uint256 signature,
-    println!("signature: {:?}",hex::encode(group_signature.z().to_bytes().as_slice()));
+    println!("signature: {:?}",hex::encode(group_signature.z().negate().to_bytes().as_slice()));
     //     uint256 msgHash,
     println!("msgHash: {:?}",hex::encode(message));
     //     address nonceTimesGeneratorAddress
     println!("R: {:?}",hex::encode(group_signature.R().to_encoded_point(false).as_ref()[1..].as_ref()));
-    /// Do this section in solidity
-    /// e = H(address(R) || m)
+    // /// Do this section in solidity
+    // /// e = H(address(R) || m)
     let R = group_signature.R().to_encoded_point(false);
     // println!("Len of R: {:?}",R.len());
     let address = address(R.as_ref()[1..].try_into().unwrap());
     println!("nonceTimesGeneratorAddress: {:?}", hex::encode(address));
-    let mut e_preimage = Vec::new();
-    e_preimage.extend_from_slice(address.as_slice());
-    e_preimage.extend_from_slice(message.as_slice());
-    let e = Keccak256::digest(e_preimage).to_vec();
+    // let mut e_preimage = Vec::new();
+    // e_preimage.extend_from_slice(address.as_slice());
+    // e_preimage.extend_from_slice(message.as_slice());
+    // let e = Keccak256::digest(e_preimage).to_vec();
+    //
+    // let address_q = ecrecover(m, v, r, s);
+    // println!("Recovered address: {:?}",hex::encode(address_q));
+    // let mut preimage = Vec::new();
+    // preimage.extend_from_slice(address_q.as_ref());
+    // preimage.extend_from_slice(message.as_ref());
+    //
+    // let e_ = Keccak256::digest(preimage.as_slice()).to_vec();
+    // assert_eq!(e, e_);
+    // println!("E: {:?}", e);
+    // println!("E': {:?}", e_);
+}
 
-    let address_q = ecrecover(m, v, r, s);
-    println!("Recovered address: {:?}",hex::encode(address_q));
-    let mut preimage = Vec::new();
-    preimage.extend_from_slice(address_q.as_ref());
-    preimage.extend_from_slice(message.as_ref());
+pub fn chainlink_verify(signingPubKeyX: Scalar,
+                        parity: u8,
+                        signature: Scalar,
+                        msgHash: [u8;20],
+                        nonceGeneratorAddress: [u8;20]
+){
+    let mut msg_challenge_preimage = Vec::new();
+    msg_challenge_preimage.extend_from_slice(nonceGeneratorAddress.as_slice());
+    msg_challenge_preimage.extend_from_slice(msgHash.as_slice());
 
-    let e_ = Keccak256::digest(preimage.as_slice()).to_vec();
-    assert_eq!(e, e_);
-    println!("E: {:?}", e);
-    println!("E': {:?}", e_);
+    let msg_challenge: [u8;20] = Keccak256::digest(msg_challenge_preimage).as_slice().try_into().unwrap();
+
+
+
 }
