@@ -175,7 +175,7 @@ pub fn test_ethereum() {
     //     uint256 msgHash,
     println!("msgHash: {:?}",hex::encode(message));
     //     address nonceTimesGeneratorAddress
-    println!("R: {:?}",hex::encode(group_signature.R().to_encoded_point(false).as_ref()[1..].as_ref()));
+    // println!("R: {:?}",hex::encode(group_signature.R().to_encoded_point(false).as_ref()[1..].as_ref()));
     // /// Do this section in solidity
     // /// e = H(address(R) || m)
     let R = group_signature.R().to_encoded_point(false);

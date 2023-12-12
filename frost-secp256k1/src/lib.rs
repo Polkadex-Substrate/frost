@@ -20,6 +20,7 @@ use k256::{
     },
     AffinePoint, ProjectivePoint, Scalar,
 };
+use k256::elliptic_curve::hash2curve::FromOkm;
 use rand_core::{CryptoRng, RngCore};
 
 use frost_core as frost;
@@ -162,10 +163,11 @@ fn hash_to_array(inputs: &[&[u8]]) -> [u8; 32] {
 }
 
 fn hash_to_scalar(_domain: &[u8], msg: &[u8]) -> Scalar {
-    let mut u = [Secp256K1ScalarField::zero()];
-    hash_to_field::<ExpandMsgXmd<Keccak256>, Scalar>(&[msg], &[&[]], &mut u)
-        .expect("should never return error according to error cases described in ExpandMsgXmd");
-    u[0]
+    // let mut u = [Secp256K1ScalarField::zero()];
+    // hash_to_field::<ExpandMsgXmd<Keccak256>, Scalar>(&[msg], &[&[]], &mut u)
+    //     .expect("should never return error according to error cases described in ExpandMsgXmd");
+    // u[0]
+    Scalar::from_repr(Keccak256::digest(msg)).expect("This is always expected to work")
 }
 
 /// Context string from the ciphersuite in the [spec].
@@ -468,7 +470,11 @@ pub fn params_for_ecrecover(
     );
     preimage.extend_from_slice(message.as_ref());
 
+    println!("msgHashChallenge preimage: {:?}", hex::encode(&preimage));
+    let e_just_hash = Scalar::from_repr(Keccak256::digest(preimage.as_slice())).unwrap();
     let e = hash_to_scalar(&[], preimage.as_slice());
+    println!("msgHashChallenge (original): {:?}",hex::encode(e.to_bytes().as_slice()));
+    println!("msgHashChallenge (just hash): {:?}",hex::encode(e_just_hash.to_bytes().as_slice()));
 
     let P_x = Scalar::from_repr(group_public_key.to_element().to_affine().x()).unwrap();
 
