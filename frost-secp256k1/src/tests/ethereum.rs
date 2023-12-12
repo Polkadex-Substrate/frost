@@ -1,17 +1,10 @@
 use crate as frost;
-use crate::{hash_to_scalar, params_for_ecrecover};
-use k256::elliptic_curve::sec1::ToEncodedPoint;
+use crate::{params_for_contract, params_for_ecrecover};
 use rand::thread_rng;
 use secp256k1::ecdsa::{RecoverableSignature, RecoveryId};
 use secp256k1::{Message, Secp256k1, SecretKey};
 use sha3::{Digest, Keccak256};
 use std::collections::BTreeMap;
-use k256::elliptic_curve::point::AffineCoordinates;
-use k256::{FieldBytes, Scalar, U256};
-use k256::elliptic_curve::generic_array::GenericArray;
-use k256::elliptic_curve::hash2curve::FromOkm;
-use k256::elliptic_curve::PrimeField;
-use k256::elliptic_curve::scalar::FromUintUnchecked;
 
 fn ecrecover(m: [u8; 32], v: u8, r: [u8; 32], s: [u8; 32]) -> [u8; 20] {
     let message = Message::from_digest(m);
@@ -20,18 +13,10 @@ fn ecrecover(m: [u8; 32], v: u8, r: [u8; 32], s: [u8; 32]) -> [u8; 20] {
     let public_key = signature.recover(&message).unwrap();
 
     let pub_key_bytes = &public_key.serialize_uncompressed()[1..];
-    println!("Recovered Public key: {:?}",hex::encode(pub_key_bytes));
+    println!("Recovered Public key: {:?}", hex::encode(pub_key_bytes));
     let hash = Keccak256::digest(pub_key_bytes);
     // println!("Pub key hash: {:?}",hex::encode(hash.to_vec()));
-    hash[12..32]
-        .try_into()
-        .unwrap()
-}
-
-fn address(uncompressed_pubk: &[u8;64]) -> [u8; 20] {
-    Keccak256::digest(uncompressed_pubk)[12..32]
-        .try_into()
-        .unwrap()
+    hash[12..32].try_into().unwrap()
 }
 
 #[test]
@@ -44,16 +29,19 @@ pub fn test_ecrecover() {
     signature.verify(&msg_hash, &public_key).unwrap();
 
     let encoded_sig = signature.serialize_compact();
-    let R: [u8;32] = encoded_sig[0..32].try_into().unwrap();
-    let S: [u8;32] = encoded_sig[32..64].try_into().unwrap();
+    let R: [u8; 32] = encoded_sig[0..32].try_into().unwrap();
+    let S: [u8; 32] = encoded_sig[32..64].try_into().unwrap();
 
-    println!("msg: {:?}",hex::encode(msg_hash.as_ref()));
-    println!("R: {:?}",hex::encode(R.as_slice()));
-    println!("S: {:?}",hex::encode(S.as_slice()));
+    println!("msg: {:?}", hex::encode(msg_hash.as_ref()));
+    println!("R: {:?}", hex::encode(R.as_slice()));
+    println!("S: {:?}", hex::encode(S.as_slice()));
 
     let recovered_address = ecrecover(msg_hash.as_ref().clone(), 1, R, S);
-    println!("recoverd: {:?}",hex::encode(recovered_address));
-    println!("Public key: {:?}",hex::encode(public_key.serialize_uncompressed()));
+    println!("recoverd: {:?}", hex::encode(recovered_address));
+    println!(
+        "Public key: {:?}",
+        hex::encode(public_key.serialize_uncompressed())
+    );
     let expected_address: [u8; 20] =
         Keccak256::digest(public_key.serialize_uncompressed()[1..].as_ref())[12..32]
             .try_into()
@@ -102,7 +90,7 @@ pub fn test_ethereum() {
     // In practice, each iteration of this loop will be executed by its respective participant.
     for participant_index in 1..(min_signers as u16 + 1) {
         let participant_identifier = participant_index.try_into().expect("should be nonzero");
-        let key_package = &key_packages[&participant_identifier];
+        let _key_package = &key_packages[&participant_identifier];
         // Generate one (1) nonce and one SigningCommitments instance for each
         // participant, up to _threshold_.
         // ANCHOR: round1_commit
@@ -163,52 +151,35 @@ pub fn test_ethereum() {
 
     let (m, v, r, s) = params_for_ecrecover(&group_signature, &group_publickey, &message);
 
-    println!("m: {:?}", hex::encode(m));
-    println!("v: {:?}", v);
-    println!("r: {:?}", hex::encode(r));
-    println!("s: {:?}", hex::encode(s));
+    // println!("m: {:?}", hex::encode(m));
+    // println!("v: {:?}", v);
+    // println!("r: {:?}", hex::encode(r));
+    // println!("s: {:?}", hex::encode(s));
 
-
-    const ORDER_HEX: &str = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141";
-
-    /// Order of the secp256k1 elliptic curve.
-    // const ORDER: U256 = U256::from_be_hex(ORDER_HEX);
-    // let Q: Scalar = Scalar::from_uint_unchecked(ORDER);
-    // let HALF_Q = (Q >> 1) + Scalar::ONE;
-    let mut Px = Scalar::from_repr(group_publickey.to_element().to_affine().x()).unwrap();
-    // if Px >= HALF_Q {
-    //     Px = Px.negate();
-    // }
-    // assert!(Px < HALF_Q);
-    let mut signature = group_signature.z();
-    // if signature >= Q {
-    //     signature = signature.negate();
-    // }
-    // assert!(signature < Q);
+    let (Px, parity, signature, message, nonceTimesGenerator) =
+        params_for_contract(&group_signature, &group_publickey, message);
     println!("Inputs for Chainlink contract");
     // uint256 signingPubKeyX,
-    println!("signingPubKeyX: {:?}",hex::encode(Px.to_bytes().as_slice()));
+    println!("signingPubKeyX: {:?}", hex::encode(Px));
     //     uint8 pubKeyYParity,
-    println!("pubKeyYParity: {:?}",v);
+    println!("pubKeyYParity: {:?}", parity);
     //     uint256 signature,
-    println!("signature: {:?}",hex::encode(signature.to_bytes().as_slice()));
+    println!("signature: {:?}", hex::encode(signature));
     //     uint256 msgHash,
-    println!("msgHash: {:?}",hex::encode(message));
+    println!("msgHash: {:?}", hex::encode(message));
     //     address nonceTimesGeneratorAddress
-    // println!("R: {:?}",hex::encode(group_signature.R().to_encoded_point(false).as_ref()[1..].as_ref()));
-    // /// Do this section in solidity
-    // /// e = H(address(R) || m)
-    let R = group_signature.R().to_encoded_point(false);
-    // println!("Len of R: {:?}",R.len());
-    let address = address(R.as_ref()[1..].try_into().unwrap());
-    println!("nonceTimesGeneratorAddress: {:?}", hex::encode(address));
+    println!(
+        "NonceTimesGenerator address: {:?}",
+        hex::encode(nonceTimesGenerator)
+    );
+
     let mut e_preimage = Vec::new();
-    e_preimage.extend_from_slice(address.as_slice());
+    e_preimage.extend_from_slice(nonceTimesGenerator.as_slice());
     e_preimage.extend_from_slice(message.as_slice());
     let e = Keccak256::digest(e_preimage).to_vec();
 
     let address_q = ecrecover(m, v, r, s);
-    println!("Recovered address: {:?}",hex::encode(address_q));
+    println!("Recovered address: {:?}", hex::encode(address_q));
     let mut preimage = Vec::new();
     preimage.extend_from_slice(address_q.as_ref());
     preimage.extend_from_slice(message.as_ref());
@@ -217,20 +188,4 @@ pub fn test_ethereum() {
     assert_eq!(e, e_);
     println!("E: {:?}", e);
     println!("E': {:?}", e_);
-}
-
-pub fn chainlink_verify(signingPubKeyX: Scalar,
-                        parity: u8,
-                        signature: Scalar,
-                        msgHash: [u8;20],
-                        nonceGeneratorAddress: [u8;20]
-){
-    let mut msg_challenge_preimage = Vec::new();
-    msg_challenge_preimage.extend_from_slice(nonceGeneratorAddress.as_slice());
-    msg_challenge_preimage.extend_from_slice(msgHash.as_slice());
-
-    let msg_challenge: [u8;20] = Keccak256::digest(msg_challenge_preimage).as_slice().try_into().unwrap();
-
-
-
 }

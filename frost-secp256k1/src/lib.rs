@@ -11,14 +11,17 @@ use std::collections::BTreeMap;
 
 use frost_rerandomized::RandomizedCiphersuite;
 use k256::elliptic_curve::point::AffineCoordinates;
-use k256::{elliptic_curve::{
-    group::prime::PrimeCurveAffine,
-    hash2curve::{hash_to_field, ExpandMsgXmd},
-    sec1::{FromEncodedPoint, ToEncodedPoint},
-    Field as FFField, PrimeField,
-}, AffinePoint, ProjectivePoint, Scalar, U256};
-use k256::elliptic_curve::hash2curve::FromOkm;
 use k256::elliptic_curve::scalar::FromUintUnchecked;
+use k256::{
+    elliptic_curve::{
+        group::prime::PrimeCurveAffine,
+        // hash2curve::{hash_to_field, ExpandMsgXmd},
+        sec1::{FromEncodedPoint, ToEncodedPoint},
+        Field as FFField,
+        PrimeField,
+    },
+    AffinePoint, ProjectivePoint, Scalar, U256,
+};
 use rand_core::{CryptoRng, RngCore};
 
 use frost_core as frost;
@@ -444,6 +447,36 @@ pub type SigningKey = frost_core::SigningKey<S>;
 /// A valid verifying key for Schnorr signatures on FROST(secp256k1, SHA-256).
 pub type VerifyingKey = frost_core::VerifyingKey<S>;
 
+/// Returns the params for solidity contract
+pub fn params_for_contract(
+    threshold_signature: &Signature,
+    group_public_key: &VerifyingKey,
+    message: [u8; 32],
+) -> ([u8; 32], u8, [u8; 32], [u8; 32], [u8; 20]) {
+    let P_x = Scalar::from_repr(group_public_key.to_element().to_affine().x()).unwrap();
+
+    let pubKeyYParity = if group_public_key.to_element().to_affine().y_is_odd().into() {
+        1u8
+    } else {
+        0
+    };
+
+    let signature = threshold_signature.z();
+
+    let R = threshold_signature.R().to_encoded_point(false);
+    // println!("Len of R: {:?}",R.len());
+    let nonceTimesGenerator = Keccak256::digest(&R.as_ref()[1..])[12..32]
+        .try_into()
+        .unwrap();
+
+    (
+        P_x.to_bytes().try_into().unwrap(),
+        pubKeyYParity,
+        signature.to_bytes().try_into().unwrap(),
+        message,
+        nonceTimesGenerator,
+    )
+}
 /// Returns the params for verification in ecrecover
 pub fn params_for_ecrecover(
     threshold_signature: &Signature,
@@ -463,7 +496,8 @@ pub fn params_for_ecrecover(
                 .R()
                 .to_affine()
                 .to_encoded_point(false)
-                .as_ref()[1..].as_ref(),
+                .as_ref()[1..]
+                .as_ref(),
         )[12..32],
     );
     preimage.extend_from_slice(message.as_ref());
@@ -471,26 +505,15 @@ pub fn params_for_ecrecover(
     let e = hash_to_scalar(&[], preimage.as_slice());
     // println!("msgHashChallenge (original): {:?}",hex::encode(e.to_bytes().as_slice()));
 
-    let mut P_x = Scalar::from_repr(group_public_key.to_element().to_affine().x()).unwrap();
-
+    let P_x = Scalar::from_repr(group_public_key.to_element().to_affine().x()).unwrap();
 
     const ORDER_HEX: &str = "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFEBAAEDCE6AF48A03BBFD25E8CD0364141";
 
     /// Order of the secp256k1 elliptic curve.
     const ORDER: U256 = U256::from_be_hex(ORDER_HEX);
     let Q: Scalar = Scalar::from_uint_unchecked(ORDER);
-    let HALF_Q = (Q >> 1) + Scalar::ONE;
-    println!("P_x < HALF_Q: {:?}",P_x < HALF_Q);
-    // if P_x >= HALF_Q {
-    //     P_x = P_x.negate();
-    // }
-
-    let mut signature = threshold_signature.z();
-    // if signature >= Q {
-    //     signature = signature.negate();
-    // }
-    println!("signature < Q: {:?}",signature < Q);
-
+    let signature = threshold_signature.z();
+    assert!(signature < Q);
 
     let m = Q.sub(&signature.mul(&P_x));
     let v = pubKeyYParity;
