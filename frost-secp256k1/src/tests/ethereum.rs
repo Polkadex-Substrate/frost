@@ -187,13 +187,13 @@ pub fn test_ethereum() {
     // assert!(signature < Q);
     println!("Inputs for Chainlink contract");
     // uint256 signingPubKeyX,
-    // println!("signingPubKeyX: {:?}",hex::encode(Px.to_bytes().as_slice()));
-    // //     uint8 pubKeyYParity,
-    // println!("pubKeyYParity: {:?}",v);
-    // //     uint256 signature,
-    // println!("signature: {:?}",hex::encode(signature.to_bytes().as_slice()));
-    // //     uint256 msgHash,
-    // println!("msgHash: {:?}",hex::encode(message));
+    println!("signingPubKeyX: {:?}",hex::encode(Px.to_bytes().as_slice()));
+    //     uint8 pubKeyYParity,
+    println!("pubKeyYParity: {:?}",v);
+    //     uint256 signature,
+    println!("signature: {:?}",hex::encode(signature.to_bytes().as_slice()));
+    //     uint256 msgHash,
+    println!("msgHash: {:?}",hex::encode(message));
     //     address nonceTimesGeneratorAddress
     // println!("R: {:?}",hex::encode(group_signature.R().to_encoded_point(false).as_ref()[1..].as_ref()));
     // /// Do this section in solidity
