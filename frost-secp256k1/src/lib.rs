@@ -168,7 +168,7 @@ fn hash_to_scalar(_domain: &[u8], msg: &[u8]) -> Scalar {
     // hash_to_field::<ExpandMsgXmd<Keccak256>, Scalar>(&[msg], &[&[]], &mut u)
     //     .expect("should never return error according to error cases described in ExpandMsgXmd");
     // u[0]
-    Scalar::from_repr(Keccak256::digest(msg)).expect("This is always expected to work")
+    Scalar::from_repr(Keccak256::digest(msg)).unwrap()
 }
 
 /// Context string from the ciphersuite in the [spec].
