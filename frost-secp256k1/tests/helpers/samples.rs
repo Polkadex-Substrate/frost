@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use frost_core::{Ciphersuite, Element, Group, Scalar};
+use frost_core::{Ciphersuite, Element, Group, Identifier, Scalar};
 use frost_secp256k1::{
     keys::{
         dkg::{round1, round2},
@@ -114,10 +114,40 @@ pub fn round1_package() -> round1::Package {
     round1::Package::new(vss_commitment, signature)
 }
 
+#[allow(dead_code)]
+pub fn round1_secret_package() -> round1::SecretPackage {
+    let serialized_scalar = <<C as Ciphersuite>::Group as Group>::Field::serialize(&scalar1());
+    let serialized_element = <C as Ciphersuite>::Group::serialize(&element1());
+    let vss_commitment =
+        VerifiableSecretSharingCommitment::deserialize(vec![serialized_element]).unwrap();
+    round1::SecretPackage {
+        identifier: Identifier::deserialize(&serialized_scalar).unwrap(),
+        coefficients: vec![scalar1()],
+        commitment: vss_commitment,
+        min_signers: 0,
+        max_signers: 0,
+    }
+}
+
 /// Generate a sample round2::Package.
 pub fn round2_package() -> round2::Package {
     let serialized_scalar = <<C as Ciphersuite>::Group as Group>::Field::serialize(&scalar1());
     let signing_share = SigningShare::deserialize(serialized_scalar).unwrap();
 
     round2::Package::new(signing_share)
+}
+
+#[allow(dead_code)]
+pub fn round2_secret_package() -> round2::SecretPackage {
+    let serialized_scalar = <<C as Ciphersuite>::Group as Group>::Field::serialize(&scalar1());
+    let serialized_element = <C as Ciphersuite>::Group::serialize(&element1());
+    let vss_commitment =
+        VerifiableSecretSharingCommitment::deserialize(vec![serialized_element]).unwrap();
+    round2::SecretPackage {
+        identifier: Identifier::deserialize(&serialized_scalar).unwrap(),
+        commitment: vss_commitment,
+        secret_share: scalar1(),
+        min_signers: 0,
+        max_signers: 0,
+    }
 }

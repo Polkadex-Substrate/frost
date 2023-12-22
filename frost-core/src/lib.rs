@@ -115,7 +115,10 @@ where
 {
     let mut preimage = vec![];
 
-    let R: [u8;65] = <C::Group>::serialize(R).as_ref().try_into().expect("it's always 65 bytes for secp256k1");
+    let R: [u8; 65] = <C::Group>::serialize(R)
+        .as_ref()
+        .try_into()
+        .expect("it's always 65 bytes for secp256k1");
     // NOTE: This indexing slicing will never panic
     preimage.extend_from_slice(Keccak256::digest(R.as_ref()[1..].as_ref())[12..32].as_ref());
     // preimage.extend_from_slice(<C::Group>::serialize(&verifying_key.element).as_ref());

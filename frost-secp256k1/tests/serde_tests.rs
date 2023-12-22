@@ -15,6 +15,26 @@ use frost_secp256k1::{
 use helpers::samples;
 
 #[test]
+fn check_dkg_round1_secret_package() {
+    let round1_secret_package = samples::round1_secret_package();
+    let json = serde_json::to_string_pretty(&round1_secret_package).unwrap();
+    println!("{}", json);
+
+    let decoded_round1_secret_package: round1::SecretPackage = serde_json::from_str(&json).unwrap();
+    assert_eq!(round1_secret_package, decoded_round1_secret_package);
+}
+
+#[test]
+fn check_dkg_round2_secret_package() {
+    let round2_secret_package = samples::round2_secret_package();
+    let json = serde_json::to_string_pretty(&round2_secret_package).unwrap();
+    println!("{}", json);
+
+    let decoded_round2_secret_package: round2::SecretPackage = serde_json::from_str(&json).unwrap();
+    assert_eq!(round2_secret_package, decoded_round2_secret_package);
+}
+
+#[test]
 fn check_signing_commitments_serialization() {
     let commitments = samples::signing_commitments();
 
