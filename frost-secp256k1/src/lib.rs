@@ -470,9 +470,9 @@ pub fn params_for_contract(
         .unwrap();
 
     (
-        P_x.to_bytes().try_into().unwrap(),
+        P_x.to_bytes().into(),
         pubKeyYParity,
-        signature.to_bytes().try_into().unwrap(),
+        signature.to_bytes().into(),
         message,
         nonceTimesGenerator,
     )

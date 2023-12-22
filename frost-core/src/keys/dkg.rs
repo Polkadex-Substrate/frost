@@ -31,19 +31,97 @@
 //! [secure broadcast channel]: https://frost.zfnd.org/terminology.html#broadcast-channel
 
 use std::{collections::BTreeMap, iter};
+use std::fmt::Formatter;
+use std::marker::PhantomData;
 
 use rand_core::{CryptoRng, RngCore};
-
-use crate::{
-    Challenge, Ciphersuite, Element, Error, Field, Group, Header, Identifier, Scalar, Signature,
-    SigningKey, VerifyingKey,
-};
+#[cfg(feature = "serde")]
+use serde::{ser::SerializeSeq,Serializer, Deserializer, de::{SeqAccess, Visitor}};
+use serde::Deserialize;
+use crate::{Challenge, Ciphersuite, Element, Error, Field, Group, Header, Identifier, Scalar, Signature, SigningKey, VerifyingKey};
+use crate::serialization::ScalarSerialization;
 
 use super::{
     evaluate_polynomial, generate_coefficients, generate_secret_polynomial,
     validate_num_of_signers, KeyPackage, PublicKeyPackage, SecretShare, SigningShare,
     VerifiableSecretSharingCommitment,
 };
+
+#[cfg(feature = "serde")]
+fn coefficients_serializer<S, C>(coefficients: &Vec<Scalar<C>>, serializer: S) -> Result<S::Ok, S::Error>
+    where S: Serializer,
+          C: Ciphersuite,
+{
+    let mut seq = serializer.serialize_seq(Some(coefficients.len()))?;
+    for element in coefficients {
+        seq.serialize_element(&ScalarSerialization::<C>(<<C::Group as Group>::Field>::serialize(element)))?;
+    }
+    seq.end()
+}
+
+#[cfg(feature = "serde")]
+fn coefficients_deserializer<'de, D, C>(deserializer: D) -> Result<Vec<Scalar<C>>, D::Error>
+    where D: Deserializer<'de>,
+          C: Ciphersuite,
+{
+    pub struct ScalarVecVisitor<C>{
+        _marker: PhantomData<C>
+    }
+
+    impl<'de, C: Ciphersuite> Visitor<'de> for ScalarVecVisitor<C>{
+        type Value = Vec<Scalar<C>>;
+
+        fn expecting(&self, formatter: &mut Formatter) -> std::fmt::Result {
+            formatter.write_str("Expecting a vec<u8>")
+        }
+
+
+        fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+            where A: SeqAccess<'de>
+        {
+            let mut coefficients: Vec<Scalar<C>> = Vec::new();
+            loop  {
+                match seq.next_element::<ScalarSerialization<C>>()? {
+                    None => break,
+                    Some(coefficient) => {
+                        let scalar = match <<C::Group as Group>::Field>::deserialize(&coefficient.0){
+                            Ok(scalar) => scalar,
+                            Err(err) => {
+                                return Err(serde::de::Error::custom(format!("Scalar<C> deserialization error: {}", err)))
+                            }
+                        };
+                    coefficients.push(scalar)
+                    }
+                }
+            }
+            Ok(coefficients)
+        }
+    }
+    deserializer.deserialize_seq(ScalarVecVisitor::<C>{ _marker: Default::default() })
+}
+
+
+
+#[cfg(feature = "serde")]
+fn secret_share_serializer<S, C>(secret_share: &Scalar<C>, serializer: S) -> Result<S::Ok, S::Error>
+    where S: Serializer,
+          C: Ciphersuite,
+{
+    serializer.serialize_newtype_struct("secret_share",&ScalarSerialization::<C>(<<C::Group as Group>::Field>::serialize(secret_share)))
+}
+
+#[cfg(feature = "serde")]
+fn secret_share_deserializer<'de, D, C>(deserializer: D) -> Result<Scalar<C>, D::Error>
+    where D: Deserializer<'de>,
+          C: Ciphersuite,
+{
+    let scalar_serialization: ScalarSerialization<C> = Deserialize::deserialize(deserializer)?;
+
+    match <<C::Group as Group>::Field>::deserialize(&scalar_serialization.0){
+        Ok(x) => Ok(x),
+        Err(err) => Err(serde::de::Error::custom(format!("Scalar<C> deserialization error: {}", err)))
+    }
+}
 
 /// DKG Round 1 structures.
 pub mod round1 {
@@ -110,11 +188,16 @@ pub mod round1 {
     ///
     /// This package MUST NOT be sent to other participants!
     #[derive(Clone, PartialEq, Eq)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    #[cfg_attr(feature = "serde", serde(bound = "C: Ciphersuite"))]
+    #[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
     pub struct SecretPackage<C: Ciphersuite> {
         /// The identifier of the participant holding the secret.
         pub(crate) identifier: Identifier<C>,
         /// Coefficients of the temporary secret polynomial for the participant.
         /// These are (a_{i0}, ..., a_{i(t−1)})) which define the polynomial f_i(x)
+        #[cfg_attr(feature = "serde", serde(serialize_with = "coefficients_serializer::<_,C>"))]
+        #[cfg_attr(feature = "serde", serde(deserialize_with = "coefficients_deserializer::<_,C>"))]
         pub(crate) coefficients: Vec<Scalar<C>>,
         /// The public commitment for the participant (C_i)
         pub(crate) commitment: VerifiableSecretSharingCommitment<C>,
@@ -226,12 +309,17 @@ pub mod round2 {
     ///
     /// This package MUST NOT be sent to other participants!
     #[derive(Clone, PartialEq, Eq)]
+    #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+    #[cfg_attr(feature = "serde", serde(bound = "C: Ciphersuite"))]
+    #[cfg_attr(feature = "serde", serde(deny_unknown_fields))]
     pub struct SecretPackage<C: Ciphersuite> {
         /// The identifier of the participant holding the secret.
         pub(crate) identifier: Identifier<C>,
         /// The public commitment from the participant (C_i)
         pub(crate) commitment: VerifiableSecretSharingCommitment<C>,
         /// The participant's own secret share (f_i(i)).
+        #[cfg_attr(feature = "serde", serde(serialize_with = "secret_share_serializer::<_,C>"))]
+        #[cfg_attr(feature = "serde", serde(deserialize_with = "secret_share_deserializer::<_,C>"))]
         pub(crate) secret_share: Scalar<C>,
         /// The minimum number of signers.
         pub(crate) min_signers: u16,
