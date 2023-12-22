@@ -275,6 +275,22 @@ pub mod round1 {
             }
         }
     }
+
+    #[cfg(feature = "serialization")]
+    impl<C> SecretPackage<C>
+        where
+            C: Ciphersuite,
+    {
+        /// Serialize the struct into a Vec.
+        pub fn serialize(&self) -> Result<Vec<u8>, Error<C>> {
+            Serialize::serialize(&self)
+        }
+
+        /// Deserialize the struct from a slice of bytes.
+        pub fn deserialize(bytes: &[u8]) -> Result<Self, Error<C>> {
+            Deserialize::deserialize(bytes)
+        }
+    }
 }
 
 /// DKG Round 2 structures.
@@ -386,6 +402,22 @@ pub mod round2 {
     {
         fn zeroize(&mut self) {
             self.secret_share = <<C::Group as Group>::Field>::zero();
+        }
+    }
+
+    #[cfg(feature = "serialization")]
+    impl<C> SecretPackage<C>
+        where
+            C: Ciphersuite,
+    {
+        /// Serialize the struct into a Vec.
+        pub fn serialize(&self) -> Result<Vec<u8>, Error<C>> {
+            Serialize::serialize(&self)
+        }
+
+        /// Deserialize the struct from a slice of bytes.
+        pub fn deserialize(bytes: &[u8]) -> Result<Self, Error<C>> {
+            Deserialize::deserialize(bytes)
         }
     }
 }
