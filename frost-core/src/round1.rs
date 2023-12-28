@@ -297,6 +297,22 @@ pub struct SigningNonces<C: Ciphersuite> {
     pub(crate) commitments: SigningCommitments<C>,
 }
 
+#[cfg(feature = "serialization")]
+impl<C> SigningNonces<C>
+    where
+        C: Ciphersuite,
+{
+    /// Serialize the struct into a Vec.
+    pub fn serialize(&self) -> Result<Vec<u8>, Error<C>> {
+        Serialize::serialize(&self)
+    }
+
+    /// Deserialize the struct from a slice of bytes.
+    pub fn deserialize(bytes: &[u8]) -> Result<Self, Error<C>> {
+        Deserialize::deserialize(bytes)
+    }
+}
+
 impl<C> SigningNonces<C>
 where
     C: Ciphersuite,
