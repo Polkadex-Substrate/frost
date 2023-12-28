@@ -10,16 +10,15 @@ use derive_getters::Getters;
 use hex::FromHex;
 
 use rand_core::{CryptoRng, RngCore};
+use serde::{Deserializer, Serializer};
 use zeroize::Zeroize;
 
 use crate as frost;
-use crate::{
-    serialization::{Deserialize, Serialize},
-    Ciphersuite, Element, Error, Field, Group, Header, Scalar,
-};
+use crate::{serialization::{Deserialize, Serialize}, Ciphersuite, Element, Error, Field, Group, Header, Scalar};
 
 #[cfg(feature = "serde")]
 use crate::serialization::ElementSerialization;
+use crate::serialization::ScalarSerialization;
 
 use super::{keys::SigningShare, Identifier};
 
@@ -201,16 +200,94 @@ where
     }
 }
 
+
+#[cfg(feature = "serde")]
+fn hiding_nonce_serializer<S, C>(hiding_nonce: &Nonce<C>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        C: Ciphersuite,
+{
+    serializer.serialize_newtype_struct(
+        "hiding_nonce",
+        hiding_nonce.serialize().as_ref(),
+    )
+}
+
+#[cfg(feature = "serde")]
+fn hiding_nonce_deserializer<'de, D, C>(deserializer: D) -> Result<Nonce<C>, D::Error>
+    where
+        D: Deserializer<'de>,
+        C: Ciphersuite,
+{
+    let scalar_serialization: ScalarSerialization<C> = serde::Deserialize::deserialize(deserializer)?;
+
+    match <<C::Group as Group>::Field>::deserialize(&scalar_serialization.0) {
+        Ok(x) => Ok(Nonce(x)),
+        Err(err) => Err(serde::de::Error::custom(format!(
+            "Scalar<C> deserialization error: {}",
+            err
+        ))),
+    }
+}
+
+
+#[cfg(feature = "serde")]
+fn binding_nonce_serializer<S, C>(binding_nonce: &Nonce<C>, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+        C: Ciphersuite,
+{
+    serializer.serialize_newtype_struct(
+        "binding_nonce",
+        binding_nonce.serialize().as_ref(),
+    )
+}
+
+#[cfg(feature = "serde")]
+fn binding_nonce_deserializer<'de, D, C>(deserializer: D) -> Result<Nonce<C>, D::Error>
+    where
+        D: Deserializer<'de>,
+        C: Ciphersuite,
+{
+    let scalar_serialization: ScalarSerialization<C> = serde::Deserialize::deserialize(deserializer)?;
+
+    match <<C::Group as Group>::Field>::deserialize(&scalar_serialization.0) {
+        Ok(x) => Ok(Nonce(x)),
+        Err(err) => Err(serde::de::Error::custom(format!(
+            "Scalar<C> deserialization error: {}",
+            err
+        ))),
+    }
+}
+
 /// Comprised of hiding and binding nonces.
 ///
 /// Note that [`SigningNonces`] must be used *only once* for a signing
 /// operation; re-using nonces will result in leakage of a signer's long-lived
 /// signing key.
 #[derive(Clone, Zeroize)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(bound = "C: Ciphersuite"))]
 pub struct SigningNonces<C: Ciphersuite> {
     /// The hiding [`Nonce`].
+    #[cfg_attr(
+    feature = "serde",
+    serde(serialize_with = "hiding_nonce_serializer::<_,C>")
+    )]
+    #[cfg_attr(
+    feature = "serde",
+    serde(deserialize_with = "hiding_nonce_deserializer::<_,C>")
+    )]
     pub(crate) hiding: Nonce<C>,
     /// The binding [`Nonce`].
+    #[cfg_attr(
+    feature = "serde",
+    serde(serialize_with = "binding_nonce_serializer::<_,C>")
+    )]
+    #[cfg_attr(
+    feature = "serde",
+    serde(deserialize_with = "binding_nonce_deserializer::<_,C>")
+    )]
     pub(crate) binding: Nonce<C>,
     /// The commitments to the nonces. This is precomputed to improve
     /// sign() performance, since it needs to check if the commitments
