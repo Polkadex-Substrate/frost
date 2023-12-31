@@ -4,10 +4,11 @@
 #![cfg_attr(docsrs, feature(doc_cfg))]
 #![doc = include_str!("../README.md")]
 #![doc = document_features::document_features!()]
+#![cfg_attr(not(feature = "std"), no_std)]
 
-extern crate core;
-
-use std::collections::BTreeMap;
+use sp_std::vec::Vec;
+use sp_std::borrow::ToOwned;
+use sp_std::collections::btree_map::BTreeMap;
 
 use frost_rerandomized::RandomizedCiphersuite;
 use k256::elliptic_curve::point::AffineCoordinates;
@@ -258,7 +259,7 @@ pub type Identifier = frost::Identifier<S>;
 /// FROST(secp256k1, SHA-256) keys, key generation, key shares.
 pub mod keys {
     use super::*;
-    use std::collections::BTreeMap;
+    use sp_std::collections::btree_map::BTreeMap;
 
     /// The identifier list to use when generating key shares.
     pub type IdentifierList<'a> = frost::keys::IdentifierList<'a, S>;
